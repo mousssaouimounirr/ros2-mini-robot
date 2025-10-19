@@ -1,4 +1,4 @@
-# 🤖 ROS2 Mini Robot (C++)
+# 🤖 ROS2 Mini Robot (C++) (working on it)
 
 Workspace ROS 2 Humble en C++ para un robot diferencial (simulación).  
 Incluye un nodo de prueba y CI con GitHub Actions.
