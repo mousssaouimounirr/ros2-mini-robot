@@ -10,6 +10,18 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 
+set(CMAKE_CXX_STANDARD 17)
+
+# Add executable for teleop keyboard
+add_executable(teleop_keyboard src/teleop_keyboard.cpp)
+ament_target_dependencies(teleop_keyboard rclcpp geometry_msgs)
+
+# Install the executable
+install(TARGETS
+  teleop_keyboard
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights
