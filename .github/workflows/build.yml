@@ -12,6 +12,51 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Debug networking and DNS
+        run: |
+          echo '--- /etc/resolv.conf ---'
+          cat /etc/resolv.conf || true
+          echo '--- ip addr ---'
+          ip addr || true
+          echo '--- route ---'
+          ip route || true
+          echo '--- nameservers (getent) ---'
+          getent hosts google.com || true
+
+      - name: Fix DNS and retry apt update
+        run: |
+          set -euo pipefail
+          echo "[ci] overwrite /etc/resolv.conf with public nameservers"
+          # Overwrite resolv.conf with reliable public DNS servers (Google + Cloudflare)
+          sudo bash -c 'echo -e "nameserver 8.8.8.8\nnameserver 1.1.1.1" > /etc/resolv.conf' || true
+          echo '--- new /etc/resolv.conf ---'
+          cat /etc/resolv.conf || true
+
+          # Ensure apt lists are clean before update
+          sudo rm -rf /var/lib/apt/lists/* || true
+          sudo apt-get clean || true
+
+          # Retry apt-get update with --fix-missing and bounded retries and explicit Acquire::Retries
+          for i in 1 2 3 4 5; do
+            echo "[ci] apt-get update attempt $i"
+            if sudo apt-get update -o Acquire::Retries=5 --fix-missing; then
+              echo "[ci] apt-get update succeeded"
+              break
+            fi
+            echo "apt-get update failed (attempt $i), sleeping and retrying..."
+            sleep $((i * 5))
+          done
+
+      - name: Install basic dependencies with retries
+        run: |
+          PACKAGES="ca-certificates curl gnupg lsb-release"
+          for i in 1 2 3 4 5; do
+            sudo apt-get install -y --no-install-recommends $PACKAGES && break
+            echo "apt-get install failed (attempt $i), retrying..."
+            sudo apt-get install -y --fix-missing || true
+            sleep $((i * 5))
+          done
+
       - name: Setup ROS 2 Humble
         uses: ros-tooling/setup-ros@v0.7
         with:
@@ -20,6 +65,4 @@ jobs:
       - name: Build with colcon
         run: |
           source /opt/ros/humble/setup.bash
-          colcon build --symlink-install --event-handlers console_cohesion+ 
-
-
+          colcon build --symlink-install --event-handlers console_cohesion+
