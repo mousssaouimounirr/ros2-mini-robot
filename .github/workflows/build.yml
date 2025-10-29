@@ -12,6 +12,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Fix DNS and retry apt update
+        run: |
+          # Ensure a public DNS is available (non-destructive if already present)
+          sudo bash -c 'if ! grep -q "nameserver 8.8.8.8" /etc/resolv.conf; then sed -i "1i nameserver 8.8.8.8" /etc/resolv.conf; fi' || true
+          # Retry apt-get update with --fix-missing and bounded retries
+          for i in 1 2 3 4 5; do
+            sudo apt-get update --fix-missing && break
+            echo "apt-get update failed (attempt $i), sleeping and retrying..."
+            sleep $((i * 5))
+          done
+
+      - name: Install basic dependencies with retries
+        run: |
+          PACKAGES="ca-certificates curl gnupg lsb-release"
+          for i in 1 2 3 4 5; do
+            sudo apt-get install -y --no-install-recommends $PACKAGES && break
+            echo "apt-get install failed (attempt $i), retrying..."
+            sudo apt-get install -y --fix-missing || true
+            sleep $((i * 5))
+          done
+
       - name: Setup ROS 2 Humble
         uses: ros-tooling/setup-ros@v0.7
         with:
@@ -20,6 +41,4 @@ jobs:
       - name: Build with colcon
         run: |
           source /opt/ros/humble/setup.bash
-          colcon build --symlink-install --event-handlers console_cohesion+ 
-
-
+          colcon build --symlink-install --event-handlers console_cohesion+
